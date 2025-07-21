@@ -4,7 +4,7 @@
 #include <vector>       // Dinamik dizi (vector) kullanmak için
 #include <string>       // String sınıfı için
 #include <cmath>        // Matematik işlemleri için (abs vb.)
-
+#include <ctime>
 using namespace std;
 
 // Veri yapısı: her satırdaki record_id ve temp değerlerini tutar
@@ -12,26 +12,30 @@ struct Veri {
     int record_id;   // Satırdaki kayıt numarası
     double temp;     // Sıcaklık değeri
 };
+int isolateDepth(const vector<double>& data, double target, int depth = 0) {
+    // Eğer veri küçükse (izole edilmişse) derinliği döndür
+    if (data.size() <= 1) return depth;
 
-// Anomali tespit fonksiyonu
-// Girilen sıcaklık verileri içindeki yüzde değişim %esikYuzde'den büyükse o indeks anomalidir
-vector<int> tespitEtAnomali(const vector<double>& veriler, double esikYuzde) {
-    vector<int> anomaliIndeksleri;  // Anomali bulunan indeksleri tutacak
+    // Rastgele bir bölme değeri seç
+    int randIndex = rand() % data.size();
+    double splitValue = data[randIndex];
 
-    // 1. elemandan başla çünkü 0. elemanın önceki yok
-    for (size_t i = 1; i < veriler.size(); ++i) {
-        double fark = veriler[i] - veriler[i - 1];           // Şimdiki ve önceki değer farkı
-        double yuzdeDegisim = fark / veriler[i - 1];         // Yüzde değişim oranı
-
-        if (abs(yuzdeDegisim) > esikYuzde) {                 // Eşikten büyükse anomali
-            anomaliIndeksleri.push_back(i);                  // İndeksi listeye ekle
-        }
+    // Veriyi sola ve sağa ayır
+    vector<double> left, right;
+    for (double val : data) {
+        if (val < splitValue) left.push_back(val);
+        else if (val > splitValue) right.push_back(val);
     }
 
-    return anomaliIndeksleri; // Anomali indekslerini döndür
+    // Hedef hangi tarafta yer alıyor?
+    if (target < splitValue) return isolateDepth(left, target, depth + 1);
+    else if (target > splitValue) return isolateDepth(right, target, depth + 1);
+    else return depth + 1; // Tam eşleştiyse izole edilmiş say
+
 }
 
-int main() {
+int main(){
+    srand(time(0)); 
     ifstream dosya("temp.csv");      // CSV dosyasını aç
     string satir;                    // Dosyadan okunan her satır için geçici değişken
     bool baslikAtlandi = false;      // Başlık satırını atlamak için kontrol değişkeni
@@ -101,28 +105,28 @@ int main() {
 
     dosya.close();  // Dosya okuma tamamlandı, kapat
 
-    // Anomali tespiti için %25 eşik koyduk
-    double esik = 0.25;
-    vector<int> anomaliIndeksleri = tespitEtAnomali(sicaklikVerisi, esik);
-
-    // Toplam veri sayısını yazdır
-    cout << "\n📈 Toplam veri sayisi: " << sicaklikVerisi.size() << endl;
-    cout << "🚨 Anomali tespit edilen satirlar:\n";
-
-    // Eğer anomali yoksa yaz
-    if (anomaliIndeksleri.empty()) {
-        cout << "YOK\n";
-    } else {
-        // Bulunan anomali indekslerini yazdır
-        for (int idx : anomaliIndeksleri) {
-            // CSV dosyasında satır numarası başlık + 1 tabanlı olduğu için +2 eklenir
-            cout << "CSV Satir (data index): " << (idx + 2)
-                 << ", record_id: " << veriSeti[idx].record_id
-                 << ", sicaklik: " << veriSeti[idx].temp << endl;
+    vector<int> ortalamaDerinlikler;
+    int numTrees = 50;
+    for (const auto& v : veriSeti) {
+        int toplamDerinlik = 0;
+        for (int i = 0; i < numTrees; ++i) {
+            toplamDerinlik += isolateDepth(sicaklikVerisi, v.temp);
         }
+        ortalamaDerinlikler.push_back(toplamDerinlik / numTrees);
+    }
+    cout << "Anomali Tespiti:\n";
+    for (size_t i = 0; i < veriSeti.size(); ++i) {
+        cout << "ID: " << veriSeti[i].record_id
+             << " | Temp: " << veriSeti[i].temp
+             << " | Derinlik: " << ortalamaDerinlikler[i];
+
+        if (ortalamaDerinlikler[i] < 3)
+            cout << " <-- ANOMALI!";
+        cout << endl;
     }
 
-    cout << "\n✅ Tespit tamamlandi.\n";
+
+  
 
     return 0;
 }
